@@ -1,0 +1,69 @@
+
+To duplicate conda env:
+    # on the PC running the current environment, copy the env specs to a yml file
+        conda env export > spec-file.yml    # stored in the current folder your terminal is in
+
+    # on another PC where you want to install the same environment, create the conda env with the spec.yml file
+        conda env create -f spec-file.yml
+
+
+Start app:
+
+    # change to folder
+    cd /home/thomsen/aaa_WRX_/VISUALS/_MitteNeu/CameraProjectorCalibration/SonyCamRX100M2_browserCtrl/
+
+    start conda virtual env "calibration"
+        conda activate calibration
+
+    # start the camera app
+        python camera_app.py
+
+Tadaa!
+
+_______________________
+
+On your system, these have to be installed globally NOT in the virtual environment
+
+    # to make Asus Xtion Pro Live camera working
+        sudo apt install libopenni2-0 libopenni2-dev openni2-utils
+        # sudo apt python3.12-venv was also suggested, but I think is already done with conda environment
+
+
+Mess with the environment
+
+    # list all installed dependencies in current running env
+        conda list
+
+    # needed pckages so far
+        # the following installed  opencv version 4.14
+            conda install --name calibration opencv
+
+        # to solve error "from PIL import Image, ImageTk"conda install search did not offer anythin PIL or image related
+        # from here:
+        # https://stackoverflow.com/questions/28588773/anaconda-python-pil-and-imagingtk
+            pip install image
+
+        # for Asus Xtion Pro Live camera to work
+            # python -m pip install --upgrade pip       # should already be installed in the conda venv
+            # python -m pip install openni numpy opencv-python      # only openni should be absent, opencv and numpy already needed before so
+            pip install openni numpy opencv-python      # this installed openni 2.3.0 on Nov2026
+
+            # NOT WORKING
+            # but since we're in conda, try the conda install of openni instead, with venv DEACTIVATED
+            # conda install --name calibration openni
+
+
+
+    # general: to install additional packages into the virtual env
+        conda install --name calibration <package-name>     # single package
+        conda install --name calibration <package-name1> <package-name2>    # multiple
+        conda install --name calibration <package-name1>=<version> <package-name2>=<version>    #multiple with specific version
+
+
+
+########################### OLD ##########
+# activate virtual env
+. .venv/bin/activate
+
+
+
