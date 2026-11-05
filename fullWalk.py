@@ -1650,62 +1650,62 @@ class CameraCaptureApp:
                        key=name: self.sync_cv2_entry_value(key))
             self.cv2_extra_controls[name]["entry"] = entry
 
-            # ==========================================
-            # XTION SOFTWARE BRIGHTNESS CONTROL
-            # ==========================================
+        # ==========================================
+        # XTION SOFTWARE BRIGHTNESS CONTROL
+        # ==========================================
 
-            self.xtion_brightness_frame = tk.Frame(
-                self.cv2_controls_frame,
-                bg=self.control_bg_cycle[1],
-                padx=10,
-                pady=10
-            )
+        self.xtion_brightness_frame = tk.Frame(
+            self.cv2_controls_frame,
+            bg=self.control_bg_cycle[1],
+            padx=10,
+            pady=10
+        )
 
-            self.xtion_brightness_frame.pack(
-                fill=tk.X,
-                pady=(0, 8),
-                ipady=4
-            )
+        self.xtion_brightness_frame.pack(
+            fill=tk.X,
+            pady=(0, 8),
+            ipady=4
+        )
 
-            tk.Label(
-                self.xtion_brightness_frame,
-                text="Xtion Preview Brightness",
-                bg="#1a1a1a",
-                fg="white",
-                anchor="w"
-            ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            self.xtion_brightness_frame,
+            text="Xtion Preview Brightness",
+            bg="#1a1a1a",
+            fg="white",
+            anchor="w"
+        ).pack(fill=tk.X, pady=(0, 4))
 
-            self.xtion_brightness_var = tk.IntVar(value=0)
+        self.xtion_brightness_var = tk.IntVar(value=0)
 
-            self.xtion_brightness_slider = tk.Scale(
-                self.xtion_brightness_frame,
-                from_=-100,
-                to=100,
-                resolution=1,
-                orient=tk.HORIZONTAL,
-                variable=self.xtion_brightness_var,
-                bg=self.control_bg_cycle[1],
-                fg="white",
-                highlightthickness=0,
-                command=self.on_xtion_brightness_change
-            )
+        self.xtion_brightness_slider = tk.Scale(
+            self.xtion_brightness_frame,
+            from_=-100,
+            to=100,
+            resolution=1,
+            orient=tk.HORIZONTAL,
+            variable=self.xtion_brightness_var,
+            bg=self.control_bg_cycle[1],
+            fg="white",
+            highlightthickness=0,
+            command=self.on_xtion_brightness_change
+        )
 
-            self.xtion_brightness_slider.pack(
-                fill=tk.X,
-                pady=(0, 4)
-            )
+        self.xtion_brightness_slider.pack(
+            fill=tk.X,
+            pady=(0, 4)
+        )
 
-            self.xtion_brightness_value_label = tk.Label(
-                self.xtion_brightness_frame,
-                text="0",
-                bg="#1a1a1a",
-                fg="white"
-            )
+        self.xtion_brightness_value_label = tk.Label(
+            self.xtion_brightness_frame,
+            text="0",
+            bg="#1a1a1a",
+            fg="white"
+        )
 
-            self.xtion_brightness_value_label.pack(fill=tk.X)
+        self.xtion_brightness_value_label.pack(fill=tk.X)
 
-            # Initially hidden. Only shown for Xtion.
-            self.xtion_brightness_frame.pack_forget()
+        # Initially hidden. Only shown for Xtion.
+        self.xtion_brightness_frame.pack_forget()
 
         self.cv2_controls_frame.pack_forget()
 
@@ -2389,45 +2389,27 @@ class CameraCaptureApp:
             return
 
         if selected == XTION_CAMERA_NAME:
-            # Show the camera settings sidebar.
-            self.show_cv2_controls()
 
+            # Open and initialize the Xtion first.
             self.open_xtion_camera()
 
-            self.configure_xtion_camera_controls()
+            # Only configure controls if initialization succeeded.
+            if self.xtion_color_stream is not None:
 
-            # Show Xtion-specific brightness control.
-            self.xtion_brightness_frame.pack(
-                fill=tk.X,
-                pady=(0, 8),
-                ipady=4
-            )
+                self.show_cv2_controls()
 
-            # Configure supported hardware controls.
-            self.configure_xtion_camera_controls()
+                self.configure_xtion_camera_controls()
 
-            self.open_xtion_camera()
+                self.xtion_brightness_frame.pack(
+                    fill=tk.X,
+                    pady=(0, 8),
+                    ipady=4
+                )
 
+                self.update_camera_resolution_choices()
 
-            print("========== XTION SIDEBAR DIAGNOSTICS ==========")
-            print(
-                "Controls frame exists:",
-                self.cv2_controls_frame.winfo_exists()
-            )
-            print(
-                "Controls frame mapped:",
-                self.cv2_controls_frame.winfo_ismapped()
-            )
-            print(
-                "Exposure frame mapped:",
-                self.exposure_frame.winfo_ismapped()
-            )
-            print(
-                "Brightness frame mapped:",
-                self.xtion_brightness_frame.winfo_ismapped()
-            )
-            print("===============================================")
             return
+
 
         match = re.search(r"(\d+)", selected)
         if not match:
@@ -2524,20 +2506,29 @@ class CameraCaptureApp:
 
             print("========================================\n")
 
-            # self.xtion_initialized = True
+            # # self.xtion_initialized = True
 
-            # activate the camera settings ctrls
-            self.configure_xtion_camera_controls()
+            # # activate the camera settings ctrls
+            # self.configure_xtion_camera_controls()
+
+            # # Populate available RGB resolutions.
+            # self.update_camera_resolution_choices()
+
+            # self.hide_cv2_controls()
+
+            # self.camera_resolution_var.set("")
+            # self.camera_resolution_menu.configure(
+            #     values=[], state="disabled"
+            # )
+
+            self.xtion_initialized = True
+
+            # Do not hide camera controls here.
+            # open_camera() handles sidebar visibility.
 
             # Populate available RGB resolutions.
             self.update_camera_resolution_choices()
 
-            self.hide_cv2_controls()
-
-            self.camera_resolution_var.set("")
-            self.camera_resolution_menu.configure(
-                values=[], state="disabled"
-            )
 
             self.status_var.set(
                 "Live preview from Asus Xtion Pro Live"
