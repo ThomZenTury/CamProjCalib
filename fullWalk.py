@@ -984,6 +984,18 @@ class CameraCaptureApp:
             "total_width": total_width,
         }
 
+    def clear_console(self, event=None):
+
+        print("[DEBUG] CTRL+L detected!")
+
+        self.status_var.set("")
+
+        print("[DEBUG] Status variable:", repr(self.status_var.get()))
+
+        self.status_label.delete(0, tk.END)
+
+        return "break"
+
     def _refresh_sidebar_layout(self):
         if not hasattr(self, "sidebar"):
             return
@@ -1294,6 +1306,7 @@ class CameraCaptureApp:
         camera_label = tk.Label(
             basic_area, text="Camera", font=("Helvetica", 12, "bold"), bg="#1a1a1a", fg="yellow", anchor="w")
         camera_label.pack(fill=tk.X, pady=(0, 4))
+        
 
         self.camera_menu = ttk.Combobox(
             basic_area, textvariable=self.camera_var, values=self.camera_names, state="readonly")
@@ -1329,6 +1342,7 @@ class CameraCaptureApp:
         # to make the status label / in-app console selectable -> make it an entry and give attribute teadonly
         self.status_label = tk.Entry(basic_area, textvariable=self.status_var,
             bg="#1a1a1a", fg="#dfe9ff", justify="left")
+        # self.status_label.bind("<Control-KeyPress-l>", self.clear_console)
         self.status_label.pack(fill=tk.X, pady=(0, 12))
 
         
@@ -3351,25 +3365,56 @@ class CameraCaptureApp:
 
 
     def on_sidebar_scroll(self, event):
-        if not self.sidebar.winfo_exists():
+        if event is None:
             return
 
-        widget_under_cursor = self.sidebar.winfo_containing(
-            event.x_root, event.y_root)
+        # Identify the widget underneath the mouse cursor.
+        widget_under_cursor = self.root.winfo_containing(
+            event.x_root,
+            event.y_root
+        )
+
         if widget_under_cursor is None:
             return
 
-        if hasattr(event, "delta"):
-            delta = event.delta
-        elif event.num == 4:
-            delta = -120
-        elif event.num == 5:
-            delta = 120
-        else:
-            delta = 0
+        # Map sidebar widgets to their corresponding canvases.
+        sidebar_canvases = [
+            (self.basic_sidebar, self.basic_canvas),
+            (self.advanced_sidebar, self.advanced_canvas),
+            (self.calibration_sidebar, self.calibration_canvas),
+            (self.projector_sidebar, self.projector_canvas),
+        ]
 
-        self.sidebar_canvas.yview_scroll(int(-delta / 120), "units")
-        return "break"
+        # Find the sidebar currently under the mouse.
+        for sidebar, canvas in sidebar_canvases:
+
+            if not sidebar.winfo_exists():
+                continue
+
+            current_widget = widget_under_cursor
+
+            while current_widget is not None:
+
+                if current_widget == sidebar:
+
+                    # Determine scroll direction.
+                    if event.num == 4:
+                        delta = -1
+
+                    elif event.num == 5:
+                        delta = 1
+
+                    else:
+                        delta = -int(event.delta / 120)
+
+                    if delta != 0:
+                        canvas.yview_scroll(delta, "units")
+
+                    return "break"
+
+                current_widget = current_widget.master
+
+        return
 
     def hide_cv2_controls(self):
         self.cv2_controls_frame.pack_forget()
@@ -3796,6 +3841,11 @@ class CameraCaptureApp:
             # Preserve original image for calibration.
             self.latest_frame = frame.copy()
 
+            # print(
+            #     f"[XTION] Frame received: "
+            #     f"{frame.shape[1]}x{frame.shape[0]}"
+            # )
+
             # Apply brightness ONLY to preview.
             brightness = self.xtion_brightness_var.get()
 
@@ -4009,19 +4059,56 @@ class CameraCaptureApp:
             self.projector_slideshow_label.configure(
                 text=os.path.basename(image_path), fg="white", bg="black")
 
+    # def _capture_projector_photo(self):
+    #     if self.latest_frame is None:
+    #         self.status_var.set(
+    #             "No live frame available for projector capture.")
+    #         return None
+
+    #     folder = self.ensure_projector_capture_folder()
+    #     index = self.get_next_graycode_capture_index()
+    #     path = os.path.join(folder, f"graycode_{index:02d}.png")
+    #     success = cv2.imwrite(path, self.latest_frame)
+    #     if not success:
+    #         raise RuntimeError(f"Could not save projector capture to {path}.")
+    #     self.status_var.set(f"Saved projector capture: {path}")
+    #     return path
+
     def _capture_projector_photo(self):
+
         if self.latest_frame is None:
-            self.status_var.set(
-                "No live frame available for projector capture.")
-            return None
+            raise RuntimeError(
+                "No camera frame available. Check the camera preview."
+            )
+
+        # Use a copy of the latest original camera frame.
+        frame = self.latest_frame.copy()
 
         folder = self.ensure_projector_capture_folder()
+
         index = self.get_next_graycode_capture_index()
-        path = os.path.join(folder, f"graycode_{index:02d}.png")
-        success = cv2.imwrite(path, self.latest_frame)
+
+        path = os.path.join(
+            folder,
+            f"graycode_{index:02d}.png"
+        )
+
+        success = cv2.imwrite(path, frame)
+
         if not success:
-            raise RuntimeError(f"Could not save projector capture to {path}.")
-        self.status_var.set(f"Saved projector capture: {path}")
+            raise RuntimeError(
+                f"Could not save camera image: {path}"
+            )
+
+        print(
+            f"[PROJECTOR] Saved capture {index}: {path} "
+            f"({frame.shape[1]}x{frame.shape[0]})"
+        )
+
+        self.status_var.set(
+            f"Saved projector capture: {path}"
+        )
+
         return path
 
     def _find_projector_test_image(self):
@@ -4119,7 +4206,7 @@ class CameraCaptureApp:
             self.projector_slideshow_speed_var.set(str(interval_seconds))
         return interval_seconds
 
-    def _capture_projector_photo_delayed(self):
+    # def _capture_projector_photo_delayed(self):
         # if not self.projector_slideshow_running:
         #     return
 
@@ -4154,89 +4241,294 @@ class CameraCaptureApp:
         # )
 
 
-        # AI assist: always one missing foto after slideshow shooting
-        def _capture_projector_photo_delayed(self):
-            if not self.projector_slideshow_running:
-                return
+    # AI assist: always one missing foto after slideshow shooting
+    def _capture_projector_photo_delayed(self):
 
-            current_index = self.projector_slideshow_index
-            last_index = len(self.projector_slideshow_images) - 1
-
-            try:
-                self._capture_projector_photo()
-            except Exception as exc:
-                self.status_var.set(f"Projector capture error: {exc}")
-                self.stop_projector_slideshow()
-                return
-
-            if current_index >= last_index:
-                self.stop_projector_slideshow()
-                return
-
-            self.projector_slideshow_index = current_index + 1
-
-            interval_seconds = self._get_projector_slideshow_interval()
-
-            self.projector_slideshow_after_id = self.projector_slideshow_window.after(
-                int(interval_seconds * 1000),
-                self._advance_projector_slideshow,
-            )
- 
-
-    def _advance_projector_slideshow(self):
         if not self.projector_slideshow_running:
             return
-        if not self.projector_slideshow_images:
+
+        current_index = self.projector_slideshow_index
+        total_images = len(self.projector_slideshow_images)
+
+        try:
+            # Capture the currently displayed pattern.
+            saved_path = self._capture_projector_photo()
+
+            if not saved_path:
+                raise RuntimeError("Camera image was not saved.")
+
+            print(
+                f"[SLIDESHOW] Captured "
+                f"{current_index + 1}/{total_images}"
+            )
+
+        except Exception as exc:
+
+            print(f"[SLIDESHOW ERROR] {exc}")
+
+            self.stop_projector_slideshow()
+
+            self.status_var.set(
+                f"Slideshow capture failed: {exc}"
+            )
+
+            return
+
+        # Check whether this was the last pattern.
+        if current_index >= total_images - 1:
+
+            self.stop_projector_slideshow()
+
+            self.status_var.set(
+                f"Slideshow completed: {total_images} images captured."
+            )
+
+            print(
+                f"[SLIDESHOW] FINISHED: "
+                f"{total_images} images captured."
+            )
+
+            return
+
+        # Move to the next pattern.
+        self.projector_slideshow_index += 1
+
+        interval = self._get_projector_slideshow_interval()
+
+        # Schedule the next pattern using the main Tkinter window.
+        self.projector_slideshow_after_id = self.root.after(
+            int(interval * 1000),
+            self._advance_projector_slideshow
+        )
+ 
+
+    # def _advance_projector_slideshow(self):
+    #     if not self.projector_slideshow_running:
+    #         return
+    #     if not self.projector_slideshow_images:
+    #         self.stop_projector_slideshow()
+    #         return
+
+    #     image_path = self.projector_slideshow_images[self.projector_slideshow_index]
+    #     self._display_projector_image(image_path)
+    #     self.projector_slideshow_after_id = self.projector_slideshow_window.after(
+    #         1000,
+    #         self._capture_projector_photo_delayed,
+    #     )
+
+    def _advance_projector_slideshow(self):
+
+        if not self.projector_slideshow_running:
+            return
+
+        total_images = len(self.projector_slideshow_images)
+
+        if total_images == 0:
             self.stop_projector_slideshow()
             return
 
-        image_path = self.projector_slideshow_images[self.projector_slideshow_index]
-        self._display_projector_image(image_path)
-        self.projector_slideshow_after_id = self.projector_slideshow_window.after(
-            1000,
-            self._capture_projector_photo_delayed,
+        if self.projector_slideshow_index >= total_images:
+            self.stop_projector_slideshow()
+            return
+
+        current_index = self.projector_slideshow_index
+
+        image_path = self.projector_slideshow_images[current_index]
+
+        print(
+            f"[SLIDESHOW] Displaying pattern "
+            f"{current_index + 1}/{total_images}: "
+            f"{os.path.basename(image_path)}"
         )
 
+        self._display_projector_image(image_path)
+
+        # Allow projector and camera exposure to settle.
+        self.projector_slideshow_after_id = self.root.after(
+            1000,
+            self._capture_projector_photo_delayed
+        )
+
+
+    # def start_projector_slideshow(self):
+    #     images = self.get_graycode_pattern_files()
+    #     if not images:
+    #         self.status_var.set("No graycode_pattern images found.")
+    #         return
+
+    #     self.projector_slideshow_images = images
+    #     self.projector_slideshow_index = 0
+    #     self.projector_slideshow_running = True
+
+    #     if self.projector_slideshow_window is None or not self.projector_slideshow_window.winfo_exists():
+    #         self.projector_slideshow_window = tk.Toplevel(self.root)
+    #         self.projector_slideshow_window.configure(bg="black")
+    #         self.projector_slideshow_window.overrideredirect(True)
+    #         self.projector_slideshow_window.attributes("-topmost", True)
+    #         self.projector_slideshow_label = None
+    #         self._configure_projector_window_geometry()
+
+    #     self.projector_slideshow_window.deiconify()
+    #     self.projector_slideshow_window.lift()
+    #     self.projector_slideshow_button.config(text="Stop Slideshow")
+    #     self.status_var.set("Projector slideshow started.")
+    #     self._advance_projector_slideshow()
+
     def start_projector_slideshow(self):
+
         images = self.get_graycode_pattern_files()
+
         if not images:
-            self.status_var.set("No graycode_pattern images found.")
+            self.status_var.set(
+                "No Gray-code pattern images found."
+            )
             return
+
+        # Check camera availability.
+        if self.camera_var.get() == XTION_CAMERA_NAME:
+
+            if self.xtion_color_stream is None:
+                self.status_var.set(
+                    "Asus Xtion RGB camera is not initialized."
+                )
+                return
+
+        elif self.camera_var.get() != "Sony HTTP API":
+
+            if self.cap is None or not self.cap.isOpened():
+                self.status_var.set(
+                    "Camera is not initialized."
+                )
+                return
+
+        # Ensure a camera image is available before starting.
+        if self.latest_frame is None:
+            self.status_var.set(
+                "Waiting for the first camera frame. "
+                "Check the camera preview."
+            )
+            return
+
+        # Cancel any previous slideshow callback.
+        if self.projector_slideshow_after_id is not None:
+            try:
+                self.root.after_cancel(
+                    self.projector_slideshow_after_id
+                )
+            except Exception:
+                pass
+
+            self.projector_slideshow_after_id = None
 
         self.projector_slideshow_images = images
         self.projector_slideshow_index = 0
         self.projector_slideshow_running = True
 
-        if self.projector_slideshow_window is None or not self.projector_slideshow_window.winfo_exists():
-            self.projector_slideshow_window = tk.Toplevel(self.root)
-            self.projector_slideshow_window.configure(bg="black")
-            self.projector_slideshow_window.overrideredirect(True)
-            self.projector_slideshow_window.attributes("-topmost", True)
+        # Create projector window if necessary.
+        if (
+            self.projector_slideshow_window is None
+            or not self.projector_slideshow_window.winfo_exists()
+        ):
+
+            self.projector_slideshow_window = tk.Toplevel(
+                self.root
+            )
+
+            self.projector_slideshow_window.configure(
+                bg="black"
+            )
+
+            self.projector_slideshow_window.overrideredirect(
+                True
+            )
+
+            self.projector_slideshow_window.attributes(
+                "-topmost", True
+            )
+
             self.projector_slideshow_label = None
+
             self._configure_projector_window_geometry()
 
         self.projector_slideshow_window.deiconify()
         self.projector_slideshow_window.lift()
-        self.projector_slideshow_button.config(text="Stop Slideshow")
-        self.status_var.set("Projector slideshow started.")
+        self.projector_slideshow_window.update_idletasks()
+
+        self.projector_slideshow_button.config(
+            text="Stop Slideshow"
+        )
+
+        self.status_var.set(
+            f"Slideshow started: {len(images)} patterns."
+        )
+
+        print("\n========== PROJECTOR SLIDESHOW ==========")
+        print(f"Camera: {self.camera_var.get()}")
+        print(f"Patterns: {len(images)}")
+        print(f"Capture folder: {self.ensure_projector_capture_folder()}")
+        print("=========================================\n")
+
+        # Start immediately with pattern zero.
         self._advance_projector_slideshow()
 
+
+
+
+    # def stop_projector_slideshow(self):
+    #     self.projector_slideshow_running = False
+    #     if self.projector_slideshow_after_id is not None:
+    #         try:
+    #             if self.projector_slideshow_window is not None and self.projector_slideshow_window.winfo_exists():
+    #                 self.projector_slideshow_window.after_cancel(
+    #                     self.projector_slideshow_after_id)
+    #         except Exception:
+    #             pass
+    #         self.projector_slideshow_after_id = None
+    #     if self.projector_slideshow_window is not None and self.projector_slideshow_window.winfo_exists():
+    #         self.projector_slideshow_window.destroy()
+    #     self.projector_slideshow_window = None
+    #     self.projector_slideshow_label = None
+    #     self.projector_slideshow_button.config(text="Start Slideshow")
+    #     self.status_var.set("Projector slideshow stopped.")
+
+
     def stop_projector_slideshow(self):
+
         self.projector_slideshow_running = False
+
+        # Cancel the scheduled callback.
         if self.projector_slideshow_after_id is not None:
+
             try:
-                if self.projector_slideshow_window is not None and self.projector_slideshow_window.winfo_exists():
-                    self.projector_slideshow_window.after_cancel(
-                        self.projector_slideshow_after_id)
+                self.root.after_cancel(
+                    self.projector_slideshow_after_id
+                )
             except Exception:
                 pass
+
             self.projector_slideshow_after_id = None
-        if self.projector_slideshow_window is not None and self.projector_slideshow_window.winfo_exists():
+
+        # Close projector window.
+        if (
+            self.projector_slideshow_window is not None
+            and self.projector_slideshow_window.winfo_exists()
+        ):
+
             self.projector_slideshow_window.destroy()
+
         self.projector_slideshow_window = None
         self.projector_slideshow_label = None
-        self.projector_slideshow_button.config(text="Start Slideshow")
-        self.status_var.set("Projector slideshow stopped.")
+
+        self.projector_slideshow_button.config(
+            text="Start Slideshow"
+        )
+
+        self.status_var.set(
+            "Projector slideshow stopped."
+        )
+
+        print("[SLIDESHOW] Stopped.")
+
 
     def toggle_projector_slideshow(self):
         if self.projector_slideshow_running:
@@ -4852,4 +5144,7 @@ class CameraCaptureApp:
 if __name__ == "__main__":
     root = tk.Tk()
     app = CameraCaptureApp(root)
+    root.bind("<Control-KeyPress-l>", app.clear_console)
+    root.bind("<Control-KeyPress-L>", app.clear_console)
+    root.bind("<F9>", lambda event: print("F9 PRESSED"))
     root.mainloop()
