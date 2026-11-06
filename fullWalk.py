@@ -1062,7 +1062,12 @@ class CameraCaptureApp:
         # self.camera_names = ["Sony HTTP API"] + \
         #     [f"Camera {idx}" for idx in self.camera_indexes]
         # asus Xtion Pro Live Camera
-        self.camera_names = (["Sony HTTP API", XTION_CAMERA_NAME]+ [f"Camera {idx}" for idx in self.camera_indexes])
+        
+        # self.camera_names = (["Sony HTTP API", XTION_CAMERA_NAME]+ [f"Camera {idx}" for idx in self.camera_indexes])
+        self.camera_names = (
+            [XTION_CAMERA_NAME, "Sony HTTP API"]
+            + [f"Camera {idx}" for idx in self.camera_indexes]
+        )
         
         self.projector_monitors = self.get_attached_monitors()
         self.projector_monitor_var = tk.StringVar(
@@ -2521,10 +2526,46 @@ class CameraCaptureApp:
             #     values=[], state="disabled"
             # )
 
+            # make deafult resolution 1280x1024 for Xtion
+
+            # self.xtion_initialized = True
+
+            # # Do not hide camera controls here.
+            # # open_camera() handles sidebar visibility.
+
+            # # Populate available RGB resolutions.
+            # self.update_camera_resolution_choices()
+
             self.xtion_initialized = True
 
-            # Do not hide camera controls here.
-            # open_camera() handles sidebar visibility.
+            # Set default Asus Xtion RGB resolution.
+            target_width = 1280
+            target_height = 1024
+
+            supported_modes = get_xtion_resolutions(
+                self.xtion_color_stream
+            )
+
+            if (target_width, target_height) in supported_modes:
+
+                self.set_xtion_resolution(
+                    target_width,
+                    target_height
+                )
+
+                print(
+                    "Default Xtion resolution set to "
+                    f"{target_width}x{target_height}"
+                )
+
+            else:
+                current_mode = self.xtion_color_stream.get_video_mode()
+
+                print(
+                    "WARNING: 1280x1024 is not supported. "
+                    f"Using {current_mode.resolutionX}x"
+                    f"{current_mode.resolutionY} instead."
+                )
 
             # Populate available RGB resolutions.
             self.update_camera_resolution_choices()
@@ -4079,38 +4120,68 @@ class CameraCaptureApp:
         return interval_seconds
 
     def _capture_projector_photo_delayed(self):
-        if not self.projector_slideshow_running:
-            return
+        # if not self.projector_slideshow_running:
+        #     return
 
-        current_index = self.projector_slideshow_index
-        last_index = len(self.projector_slideshow_images) - 1
+        # current_index = self.projector_slideshow_index
+        # last_index = len(self.projector_slideshow_images) - 1
 
-        if current_index == 0:
-            self.projector_slideshow_index = 1
+        # if current_index == 0:
+        #     self.projector_slideshow_index = 1
+        #     interval_seconds = self._get_projector_slideshow_interval()
+        #     self.projector_slideshow_after_id = self.projector_slideshow_window.after(
+        #         int(interval_seconds * 1000),
+        #         self._advance_projector_slideshow,
+        #     )
+        #     return
+
+        # try:
+        #     self._capture_projector_photo()
+        # except Exception as exc:
+        #     self.status_var.set(f"Projector capture error: {exc}")
+        #     self.stop_projector_slideshow()
+        #     return
+
+        # if current_index >= last_index:
+        #     self.stop_projector_slideshow()
+        #     return
+
+        # self.projector_slideshow_index = current_index + 1
+        # interval_seconds = self._get_projector_slideshow_interval()
+        # self.projector_slideshow_after_id = self.projector_slideshow_window.after(
+        #     int(interval_seconds * 1000),
+        #     self._advance_projector_slideshow,
+        # )
+
+
+        # AI assist: always one missing foto after slideshow shooting
+        def _capture_projector_photo_delayed(self):
+            if not self.projector_slideshow_running:
+                return
+
+            current_index = self.projector_slideshow_index
+            last_index = len(self.projector_slideshow_images) - 1
+
+            try:
+                self._capture_projector_photo()
+            except Exception as exc:
+                self.status_var.set(f"Projector capture error: {exc}")
+                self.stop_projector_slideshow()
+                return
+
+            if current_index >= last_index:
+                self.stop_projector_slideshow()
+                return
+
+            self.projector_slideshow_index = current_index + 1
+
             interval_seconds = self._get_projector_slideshow_interval()
+
             self.projector_slideshow_after_id = self.projector_slideshow_window.after(
                 int(interval_seconds * 1000),
                 self._advance_projector_slideshow,
             )
-            return
-
-        try:
-            self._capture_projector_photo()
-        except Exception as exc:
-            self.status_var.set(f"Projector capture error: {exc}")
-            self.stop_projector_slideshow()
-            return
-
-        if current_index >= last_index:
-            self.stop_projector_slideshow()
-            return
-
-        self.projector_slideshow_index = current_index + 1
-        interval_seconds = self._get_projector_slideshow_interval()
-        self.projector_slideshow_after_id = self.projector_slideshow_window.after(
-            int(interval_seconds * 1000),
-            self._advance_projector_slideshow,
-        )
+ 
 
     def _advance_projector_slideshow(self):
         if not self.projector_slideshow_running:
